@@ -1,0 +1,9 @@
+{
+	"DB": "users.db",
+	"Server": "localhost:8080",
+	"Apps": {
+		"test": {},
+		"test2": {},
+		"test3": {}
+	}
+}
