@@ -28,12 +28,12 @@ func NewHTTPService(config *Config, mux *http.ServeMux) (*HTTPService, error) {
 		store:  store,
 		config: config,
 	}
+	mux.HandleFunc("/", handleWithData("root", service.GetApps))
 	for appId := range config.Apps {
 		mux.HandleFunc(fmt.Sprintf("/%s", appId), handleWithData(appId, service.GetBundles))
 		mux.HandleFunc(fmt.Sprintf("/%s/register", appId), handleWithData(appId, service.RegisterDevice))
 		mux.HandleFunc(fmt.Sprintf("/%s/push", appId), handleWithData(appId, service.PushMessage))
 	}
-	mux.HandleFunc("/", service.GetApps)
 	return service, nil
 }
 
@@ -70,19 +70,12 @@ func handleWithData(appId string, handle Handle) http.HandlerFunc {
 	}
 }
 
-func (s *HTTPService) GetApps(w http.ResponseWriter, r *http.Request) {
+func (s *HTTPService) GetApps(_ string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
 	result := make([]string, 0, len(s.config.Apps))
 	for app := range s.config.Apps {
 		result = append(result, app)
 	}
-	data, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; encoding=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	return http.StatusOK, result
 }
 
 func (s *HTTPService) GetBundles(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
