@@ -66,7 +66,7 @@ func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *htt
 			Token:  r.FormValue("token"),
 		}
 	}
-	regDevice.AppId = appId // добавляем идентификатор сервиса
+	regDevice.App = appId // добавляем идентификатор сервиса
 	// if err := regDevice.Check(); err != nil { // проверяем правильность параметров
 	// 	http.Error(w, err.Error(), http.StatusBadRequest)
 	// 	return

@@ -36,24 +36,28 @@ func (s *Store) AddDevice(regDevice *DeviceRegister) error {
 		return errors.New("no parameters")
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
-		// bucket, err := tx.CreateBucketIfNotExists([]byte(regDevice.AppId)) // Открываем коллекцию данных приложения
-		// if err != nil {
-		// 	return err
-		// }
-		// devices := new(Devices)
-		// if data := bucket.Get([]byte(regDevice.UserId)); data != nil { // Запрашиваем список устройств пользователя
-		// 	if err := codec.NewDecoderBytes(data, &codecHandle).Decode(devices); err != nil { // Декодируем данные
-		// 		return err
-		// 	}
-		// }
-		// if !devices.Add(regDevice.DeviceType, regDevice.DeviceId) {
-		// 	return nil // Идентификатор уже был в списке — нечего сохранять
-		// }
-		// var data []byte
-		// if err := codec.NewEncoderBytes(&data, &codecHandle).Encode(devices); err != nil { // Кодируем данные для сохранения
-		// 	return err
-		// }
-		// return bucket.Put([]byte(regDevice.UserId), data) // Сохраняем их в хранилище
-		return nil
+		// открываем коллекцию данных приложения
+		bucket, err := tx.CreateBucketIfNotExists([]byte(regDevice.App))
+		if err != nil {
+			return err
+		}
+		devices := make(Devices)
+		// подгужаем данные пользователя, если они существуют
+		if data := bucket.Get([]byte(regDevice.User)); data != nil {
+			if err := codec.NewDecoderBytes(data, &codecHandle).Decode(&devices); err != nil {
+				return err
+			}
+		}
+		// добавляем токен устройства для указанного идентификатора приложения
+		if !devices.Add(regDevice.Bundle, regDevice.Token) {
+			return nil // Идентификатор уже был в списке — нечего сохранять
+		}
+
+		var data []byte
+		// кодируем в бинарный формат
+		if err := codec.NewEncoderBytes(&data, &codecHandle).Encode(devices); err != nil { // Кодируем данные для сохранения
+			return err
+		}
+		return bucket.Put([]byte(regDevice.User), data) // Сохраняем их в хранилище
 	})
 }
