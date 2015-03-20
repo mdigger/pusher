@@ -8,9 +8,9 @@ import (
 
 // Config описывает настройки сервера.
 type Config struct {
-	DB     string                        // имя файла с хранилищем
-	Server string                        // адрес и порт для запуска сервиса
-	Apps   map[string]map[string]*Bundle // список поддерживаемых приложений с разбиением по bundleId
+	DB     string                        `json:"db"`     // имя файла с хранилищем
+	Server string                        `json:"server"` // адрес и порт для запуска сервиса
+	Apps   map[string]map[string]*Bundle `json:"apps"`   // список поддерживаемых приложений с разбиением по bundleId
 }
 
 // Bundle описывает информацию для подключения к сервису.

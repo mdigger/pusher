@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 )
+
+type Handle func(string, http.ResponseWriter, *http.Request) (int, interface{})
 
 // HTTPService описывает HTTP-сервис для работы отправки push-уведомлений и регистрации новых устройств.
 type HTTPService struct {
@@ -24,22 +25,43 @@ func NewHTTPService(config *Config, mux *http.ServeMux) (*HTTPService, error) {
 		return nil, fmt.Errorf("error opening database: %v", err)
 	}
 	service := &HTTPService{
-		store: store,
+		store:  store,
+		config: config,
 	}
 	for appId := range config.Apps {
+		mux.HandleFunc(fmt.Sprintf("/%s", appId), handleWithData(appId, service.GetBundles))
 		mux.HandleFunc(fmt.Sprintf("/%s/register", appId), handleWithData(appId, service.RegisterDevice))
 		mux.HandleFunc(fmt.Sprintf("/%s/push", appId), handleWithData(appId, service.PushMessage))
 	}
+	mux.HandleFunc("/", service.GetApps)
 	return service, nil
 }
 
-func handleWithData(appId string, handle func(string, http.ResponseWriter, *http.Request)) http.HandlerFunc {
+func handleWithData(appId string, handle Handle) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET": // TODO: Убрать после отладки
 			fallthrough
 		case "POST", "PUT":
-			handle(appId, w, r)
+			code, data := handle(appId, w, r)
+			if code != http.StatusOK || code != http.StatusInternalServerError {
+				code = http.StatusInternalServerError
+			}
+			jsonData, err := json.MarshalIndent(data, "", "  ")
+			if err != nil {
+				jsonData, err := json.MarshalIndent(err, "", "  ")
+				if err != nil {
+					http.Error(w, string(jsonData), http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json; encoding=utf-8")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write(jsonData)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; encoding=utf-8")
+			w.WriteHeader(code)
+			w.Write(jsonData)
 		default:
 			w.Header().Set("Allow", "POST,PUT")
 			http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
@@ -48,7 +70,30 @@ func handleWithData(appId string, handle func(string, http.ResponseWriter, *http
 	}
 }
 
-func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *http.Request) {
+func (s *HTTPService) GetApps(w http.ResponseWriter, r *http.Request) {
+	result := make([]string, 0, len(s.config.Apps))
+	for app := range s.config.Apps {
+		result = append(result, app)
+	}
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; encoding=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func (s *HTTPService) GetBundles(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
+	result := make([]string, 0, len(s.config.Apps[appId]))
+	for app := range s.config.Apps[appId] {
+		result = append(result, app)
+	}
+	return http.StatusOK, result
+}
+
+func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
 	// Разбираем параметры запроса
 	var regDevice *DeviceRegister
 	switch mimetype := r.Header.Get("Content-Type"); {
@@ -56,8 +101,7 @@ func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *htt
 		regDevice = new(DeviceRegister)
 		defer r.Body.Close()
 		if err := json.NewDecoder(r.Body).Decode(regDevice); err != nil {
-			http.Error(w, fmt.Sprintf("error parsing JSON request: %v", err), http.StatusBadRequest)
-			return
+			return http.StatusBadRequest, fmt.Sprintf("error parsing JSON request: %v", err)
 		}
 	default: // form
 		regDevice = &DeviceRegister{ // form или get
@@ -66,39 +110,20 @@ func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *htt
 			Token:  r.FormValue("token"),
 		}
 	}
-	regDevice.App = appId // добавляем идентификатор сервиса
-	// if err := regDevice.Check(); err != nil { // проверяем правильность параметров
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// if err := s.store.AddDevice(regDevice); err != nil { // сохраняем в хранилище
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
-	log.Println("Registered:", regDevice)
-	// w.WriteHeader(http.StatusNoContent)
-	http.Error(w, http.StatusText(http.StatusOK), http.StatusOK) // возвращаем, что все хорошо
+	// сохраняем в хранилище
+	if err := s.store.AddDevice(appId, regDevice.Bundle, regDevice.User, regDevice.Token); err != nil {
+		return http.StatusInternalServerError, err.Error()
+	}
+	return http.StatusOK, regDevice
 }
 
-func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.Request) {
-	_ = r.FormValue("userId")
-	// if userId == "" {
-	// 	http.Error(w, ErrDeviceRegistration_EmptyUserId.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// devices, err := s.store.GetDevices(appId, userId)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
-	// data, err := json.MarshalIndent(devices, "", "\t")
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
-	w.Header().Set("Content-Type", "application/json; encoding=utf-8")
-	w.WriteHeader(http.StatusOK)
-	// w.Write(data)
+func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
+	userId := r.FormValue("user")
+	devices, err := s.store.GetDevices(appId, userId)
+	if err != nil {
+		return http.StatusInternalServerError, err.Error()
+	}
+	return http.StatusOK, devices
 }
 
 func (s *HTTPService) Close() error {
