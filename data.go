@@ -1,5 +1,10 @@
 package pusher
 
+import (
+	"github.com/mdigger/apns"
+)
+
+// DeviceRegister описывает информацию для регистрации нового токена устройства пользователя.
 type DeviceRegister struct {
 	App    string `json:"-"`      // идентификатор сервиса
 	User   string `json:"user"`   // идентификатор пользователя
@@ -7,11 +12,19 @@ type DeviceRegister struct {
 	Token  string `json:"token"`  // идентификатор устройства
 }
 
+// PushMessage описывает информацию для отправки push-уведомления.
+type PushMessage struct {
+	App      string                        `json:"-"`        // идентификатор сервиса
+	Users    []string                      `json:"users"`    // идентификаторы пользователей
+	Messages map[string]*apns.Notification `json:"messages"` // сообщение для отправки с привязкой к идентификаторам приложения
+}
+
 // Devices описывает список токенов устройств по идентификаторам приложений.
 type Devices map[string][]string
 
-// Add добавляет новый уникальный идентификатор в список уникальных идентификаторов.
-// Если такой идентификатор уже есть в списке, то возвращает false. В противном случае возвращает true.
+// Add добавляет новый уникальный токен устройства в список уникальных идентификаторов.
+// Если такой идентификатор уже есть в списке, то возвращает false. В противном случае возвращает
+// true.
 func (d Devices) Add(bundle, token string) bool {
 	if _, ok := d[bundle]; !ok {
 		d[bundle] = []string{token}
@@ -26,7 +39,9 @@ func (d Devices) Add(bundle, token string) bool {
 	return true
 }
 
-// Remove удаляет уникальный идентификатор из списка уникальных идентификаторов.
+// Remove удаляет уникальный токен устройства из списка уникальных идентификаторов. В ответ
+// возвращает true, если идентификатор удален, или false, если такого идентификатора небыло в
+// списке.
 func (d Devices) Remove(bundle, token string) bool {
 	for i, id := range d[bundle] {
 		if id == token {
@@ -37,7 +52,7 @@ func (d Devices) Remove(bundle, token string) bool {
 	return false
 }
 
-// List возвращает список уникальных идентификаторов.
+// List возвращает список уникальных токенов для указанного приложения.
 func (d Devices) List(bundle string) []string {
 	return d[bundle]
 }

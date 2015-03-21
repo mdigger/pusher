@@ -1,8 +1,11 @@
 package pusher
 
 import (
+	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"github.com/mdigger/apns"
 	"os"
 )
 
@@ -15,16 +18,18 @@ type Config struct {
 
 // Bundle описывает информацию для подключения к сервису.
 type Bundle struct {
-	// тип соединения: должно быть "apns" или "gcm"
+	// тип соединения: должно быть "apns"
 	Type string `json:"type"`
-	// флаг соединения с отладочным сервером (для apns)
-	Sandbox bool `json:"sandbox"`
-	// сертификаты TLS (для apns)
+	// идентификатор приложения
+	BundleId string `json:"bundleId"`
+	// флаг соединения с отладочным сервером
+	Sandbox bool `json:"sandbox,omitempty"`
+	// сертификаты TLS
 	Certificate [][]byte `json:"certificate"`
-	// приватный ключ (для apns)
+	// приватный ключ
 	PrivateKey []byte `json:"privateKey"`
-	// приватный ключ (для gcm)
-	AppKey string `json:"appKey"`
+	// клиент для отсылки уведомлений
+	apnsClient *apns.Client
 }
 
 // LoadConfig читает конфигурационный файл и возвращает его описание.
@@ -47,6 +52,30 @@ func LoadConfig(filename string) (*Config, error) {
 	if config.Server == "" {
 		config.Server = "localhost:8080" // адрес и порт сервиса по умолчанию
 	}
+	// инициализируем клиентов для всех приложений
+	for _, bundles := range config.Apps {
+		for _, bundle := range bundles {
+			if bundle.Type == "apns" {
+				cert, err := tls.X509KeyPair(
+					bytes.Join(bundle.Certificate, []byte{'\n'}), bundle.PrivateKey)
+				if err != nil {
+					return nil, err
+				}
+				var conf = &apns.Config{
+					BundleId:    bundle.BundleId,
+					Sandbox:     bundle.Sandbox,
+					Certificate: cert,
+				}
+				conf.SetLogger(nil)
+				client, err := conf.Connect()
+				if err != nil {
+					return nil, err
+				}
+				bundle.apnsClient = client
+			}
+		}
+	}
+
 	return config, nil
 }
 

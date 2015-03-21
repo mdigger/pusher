@@ -2,7 +2,7 @@
 	"db": "users.db",
 	"server": "localhost:8080",
 	"apps": {
-		"test": {
+		"push-test": {
 			"com.xyzrd.PushTest": {
 				"type": "apns",
 				"sandbox": true,

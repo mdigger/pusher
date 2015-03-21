@@ -10,7 +10,6 @@ var codecHandle codec.CborHandle // параметры кодирования д
 // Store описывает хранилище данных.
 type Store struct {
 	db *bolt.DB // хранилище
-
 }
 
 // OpenStore открывает и возвращает хранилище данных.
@@ -59,8 +58,8 @@ func (s *Store) AddDevice(app, bundle, user, token string) error {
 }
 
 // GetDevices возвращает для каждого пользователя список зарегистрированных для него устройств.
-func (s *Store) GetDevices(app string, users ...string) (map[string]*Devices, error) {
-	var result = make(map[string]*Devices, len(users))
+func (s *Store) GetDevices(app string, users ...string) (map[string]Devices, error) {
+	var result = make(map[string]Devices, len(users))
 	err := s.db.View(func(tx *bolt.Tx) error {
 		// открываем коллекцию данных приложения
 		bucket := tx.Bucket([]byte(app))
@@ -73,7 +72,7 @@ func (s *Store) GetDevices(app string, users ...string) (map[string]*Devices, er
 					return err
 				}
 			}
-			result[user] = &devices
+			result[user] = devices
 		}
 		return nil
 	})
