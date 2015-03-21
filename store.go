@@ -1,11 +1,10 @@
 package pusher
 
 import (
+	"bytes"
+	"encoding/gob"
 	"github.com/boltdb/bolt"
-	"github.com/ugorji/go/codec"
 )
-
-var codecHandle codec.CborHandle // параметры кодирования данных
 
 // Store описывает хранилище данных.
 type Store struct {
@@ -39,7 +38,7 @@ func (s *Store) AddDevice(app, bundle, user, token string) error {
 		// подгужаем данные пользователя, если они существуют
 		devices := make(Devices)
 		if data := bucket.Get([]byte(user)); data != nil {
-			if err := codec.NewDecoderBytes(data, &codecHandle).Decode(&devices); err != nil {
+			if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&devices); err != nil {
 				return err
 			}
 		}
@@ -48,12 +47,12 @@ func (s *Store) AddDevice(app, bundle, user, token string) error {
 			return nil // Идентификатор уже был в списке — нечего сохранять
 		}
 
-		var data []byte
+		var data bytes.Buffer
 		// кодируем в бинарный формат
-		if err := codec.NewEncoderBytes(&data, &codecHandle).Encode(devices); err != nil { // Кодируем данные для сохранения
+		if err := gob.NewEncoder(&data).Encode(devices); err != nil { // Кодируем данные для сохранения
 			return err
 		}
-		return bucket.Put([]byte(user), data) // Сохраняем их в хранилище
+		return bucket.Put([]byte(user), data.Bytes()) // Сохраняем их в хранилище
 	})
 }
 
@@ -68,7 +67,7 @@ func (s *Store) GetDevices(app string, users ...string) (map[string]Devices, err
 			devices := make(Devices)
 			// подгружаем данные пользователя, если они существуют
 			if data := bucket.Get([]byte(user)); data != nil {
-				if err := codec.NewDecoderBytes(data, &codecHandle).Decode(&devices); err != nil {
+				if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&devices); err != nil {
 					return err
 				}
 			}
