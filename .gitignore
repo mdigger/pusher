@@ -1,2 +1,6 @@
 
 *.db
+
+server/server
+
+*.zip
