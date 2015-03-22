@@ -67,15 +67,10 @@ func LoadConfig(filename string) (*Config, error) {
 					Certificate: cert,
 				}
 				conf.SetLogger(nil)
-				client, err := conf.Connect()
-				if err != nil {
-					return nil, err
-				}
-				bundle.apnsClient = client
+				bundle.apnsClient = apns.NewClient(conf)
 			}
 		}
 	}
-
 	return config, nil
 }
 
