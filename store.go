@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/gob"
 	"github.com/boltdb/bolt"
+	"log"
 )
 
 // Store описывает хранилище данных.
 type Store struct {
-	db *bolt.DB // хранилище
+	db    *bolt.DB   // хранилище
+	stats bolt.Stats // статистика базы
 }
 
 // OpenStore открывает и возвращает хранилище данных.
@@ -17,8 +19,18 @@ func OpenStore(filename string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.View(func(tx *bolt.Tx) error {
+		// делаем копию файла
+		if err := tx.CopyFile(db.Path()+".bak", 0666); err != nil {
+			log.Printf("Error database backup: %v", err)
+			return err
+		}
+		log.Printf("DB Size: %d", tx.Size())
+		return nil
+	})
 	return &Store{
-		db: db,
+		db:    db,
+		stats: db.Stats(), // сохраняем статистику при открытии
 	}, nil
 }
 
@@ -29,13 +41,13 @@ func (s *Store) Close() error {
 
 // AddDevice добавляет в хранилище информацию об идентификаторе устройства пользователя приложения.
 func (s *Store) AddDevice(app, bundle, user, token string) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+	return s.db.Batch(func(tx *bolt.Tx) error {
 		// открываем коллекцию данных приложения
 		bucket, err := tx.CreateBucketIfNotExists([]byte(app))
 		if err != nil {
 			return err
 		}
-		// подгужаем данные пользователя, если они существуют
+		// подгружаем данные пользователя, если они существуют
 		devices := make(Devices)
 		if data := bucket.Get([]byte(user)); data != nil {
 			if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&devices); err != nil {
