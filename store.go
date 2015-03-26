@@ -3,8 +3,9 @@ package pusher
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/boltdb/bolt"
 	"log"
+
+	"github.com/boltdb/bolt"
 )
 
 // Store описывает хранилище данных.
@@ -19,24 +20,37 @@ func OpenStore(filename string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	var store = &Store{
+		db:    db,
+		stats: db.Stats(), // сохраняем статистику при открытии
+	}
+	store.Backup()
+	return store, nil
+}
+
+// Close закрывает ранее открытое хранилище данных.
+func (s *Store) Close() error {
+	return s.db.Close()
+}
+
+// Backup сохраняет копию базы данных.
+func (s *Store) Backup() {
+	if s.db == nil {
+		return
+	}
+	var name = s.db.Path()
+	if name == "" {
+		return // база закрыта
+	}
 	db.View(func(tx *bolt.Tx) error {
 		// делаем копию файла
-		if err := tx.CopyFile(db.Path()+".bak", 0666); err != nil {
+		if err := tx.CopyFile(name+".bak", 0666); err != nil {
 			log.Printf("Error database backup: %v", err)
 			return err
 		}
 		log.Printf("DB Size: %d", tx.Size())
 		return nil
 	})
-	return &Store{
-		db:    db,
-		stats: db.Stats(), // сохраняем статистику при открытии
-	}, nil
-}
-
-// Close закрывает ранее открытое хранилище данных.
-func (s *Store) Close() error {
-	return s.db.Close()
 }
 
 // AddDevice добавляет в хранилище информацию об идентификаторе устройства пользователя приложения.

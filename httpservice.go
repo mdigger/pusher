@@ -150,26 +150,27 @@ func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.R
 			log.Println("Ignore:", bundleId)
 			continue // игнорируем ошибочные идентификаторы приложения
 		}
-		if config.Type != "apns" {
+		switch config.Type {
+		case "apns":
+			// собираем все токены от всех пользователей для данного приложения
+			var tokens = make([]string, 0)
+			for _, devices := range users {
+				if toks := devices[bundleId]; len(toks) > 0 {
+					tokens = append(tokens, toks...)
+				}
+			}
+			// проверяем, что клиент для отправки определен
+			if config.apnsClient == nil {
+				return http.StatusInternalServerError, fmt.Errorf("client for %q not initialized", bundleId)
+			}
+			// отправляем сообщения
+			if err := config.apnsClient.Send(push, tokens...); err != nil {
+				return http.StatusInternalServerError, err
+			}
+		default:
 			log.Println("Ignore not APNS:", bundleId)
 			continue // TODO: убрать ограничение по типу
 		}
-		// собираем все токены от всех пользователей для данного приложения
-		var tokens = make([]string, 0)
-		for _, devices := range users {
-			if toks := devices[bundleId]; len(toks) > 0 {
-				tokens = append(tokens, toks...)
-			}
-		}
-		// проверяем, что клиент для отправки определен
-		if config.apnsClient == nil {
-			return http.StatusInternalServerError, fmt.Errorf("client for %q not initialized", bundleId)
-		}
-		// отправляем сообщения
-		if err := config.apnsClient.Send(push, tokens...); err != nil {
-			return http.StatusInternalServerError, err
-		}
-
 	}
 	return http.StatusOK, http.StatusText(http.StatusOK)
 }
