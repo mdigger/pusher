@@ -5,8 +5,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"github.com/mdigger/apns"
 	"os"
+
+	"github.com/mdigger/apns"
 )
 
 // Config описывает настройки сервера.
@@ -21,7 +22,7 @@ type Bundle struct {
 	// тип соединения: должно быть "apns"
 	Type string `json:"type"`
 	// идентификатор приложения
-	BundleId string `json:"bundleId"`
+	BundleID string `json:"bundleId"`
 	// флаг соединения с отладочным сервером
 	Sandbox bool `json:"sandbox,omitempty"`
 	// сертификаты TLS
@@ -62,7 +63,7 @@ func LoadConfig(filename string) (*Config, error) {
 					return nil, err
 				}
 				var conf = &apns.Config{
-					BundleId:    bundle.BundleId,
+					BundleID:    bundle.BundleID,
 					Sandbox:     bundle.Sandbox,
 					Certificate: cert,
 				}

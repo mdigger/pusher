@@ -42,7 +42,7 @@ func (s *Store) Backup() {
 	if name == "" {
 		return // база закрыта
 	}
-	db.View(func(tx *bolt.Tx) error {
+	s.db.View(func(tx *bolt.Tx) error {
 		// делаем копию файла
 		if err := tx.CopyFile(name+".bak", 0666); err != nil {
 			log.Printf("Error database backup: %v", err)

@@ -34,17 +34,17 @@ func NewHTTPService(config *Config, mux *http.ServeMux) (*HTTPService, error) {
 		config: config,
 	}
 	mux.HandleFunc("/", handleWithData("root", service.GetApps))
-	for appId := range config.Apps {
-		mux.HandleFunc(fmt.Sprintf("/%s", appId), handleWithData(appId, service.GetBundles))
-		mux.HandleFunc(fmt.Sprintf("/%s/register", appId), handleWithData(appId, service.RegisterDevice))
-		mux.HandleFunc(fmt.Sprintf("/%s/push", appId), handleWithData(appId, service.PushMessage))
+	for appID := range config.Apps {
+		mux.HandleFunc(fmt.Sprintf("/%s", appID), handleWithData(appID, service.GetBundles))
+		mux.HandleFunc(fmt.Sprintf("/%s/register", appID), handleWithData(appID, service.RegisterDevice))
+		mux.HandleFunc(fmt.Sprintf("/%s/push", appID), handleWithData(appID, service.PushMessage))
 	}
 	return service, nil
 }
 
 // handleWithData принимает все запросы к сервису и отвечает за их разбор и вывод информации.
 // Это промежуточный слой, выполняемый для всех запросов к сервису.
-func handleWithData(appId string, handle Handle) http.HandlerFunc {
+func handleWithData(appID string, handle Handle) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "POST", "PUT": // поддерживаем только эти типы запросов
@@ -61,7 +61,7 @@ func handleWithData(appId string, handle Handle) http.HandlerFunc {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
-		code, data := handle(appId, w, r) // вызываем оригинальный обработчик запроса
+		code, data := handle(appID, w, r) // вызываем оригинальный обработчик запроса
 		switch code {
 		case http.StatusOK, http.StatusInternalServerError, http.StatusBadRequest:
 		default:
@@ -94,9 +94,9 @@ func (s *HTTPService) GetApps(_ string, w http.ResponseWriter, r *http.Request) 
 }
 
 // GetBundles возвращает список приложений, поддерживаемых данным сервисом.
-func (s *HTTPService) GetBundles(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
-	result := make([]string, 0, len(s.config.Apps[appId]))
-	for app := range s.config.Apps[appId] {
+func (s *HTTPService) GetBundles(appID string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
+	result := make([]string, 0, len(s.config.Apps[appID]))
+	for app := range s.config.Apps[appID] {
 		result = append(result, app)
 	}
 	return http.StatusOK, result
@@ -104,7 +104,7 @@ func (s *HTTPService) GetBundles(appId string, w http.ResponseWriter, r *http.Re
 
 // RegisterDevice регистрирует токен устройства в базе данных в привязке к сервису, пользователю и
 // идентификатору приложения.
-func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
+func (s *HTTPService) RegisterDevice(appID string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
 	// Разбираем параметры запроса
 	var regDevice DeviceRegister
 	defer r.Body.Close()
@@ -112,7 +112,7 @@ func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *htt
 		return http.StatusBadRequest, fmt.Sprintf("error parsing JSON request: %v", err)
 	}
 	// сохраняем в хранилище
-	if err := s.store.AddDevice(appId, regDevice.Bundle, regDevice.User, regDevice.Token); err != nil {
+	if err := s.store.AddDevice(appID, regDevice.Bundle, regDevice.User, regDevice.Token); err != nil {
 		return http.StatusInternalServerError, err.Error()
 	}
 	return http.StatusOK, http.StatusText(http.StatusOK)
@@ -120,7 +120,7 @@ func (s *HTTPService) RegisterDevice(appId string, w http.ResponseWriter, r *htt
 
 // PushMessage отправляет переданные push-уведомление на все устройства указанных в запросе
 // пользователей.
-func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
+func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
 	// разбираем параметры запроса
 	var message PushMessage
 	defer r.Body.Close()
@@ -131,7 +131,7 @@ func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.R
 		return http.StatusBadRequest, errors.New("no users")
 	}
 	// получаем информацию о пользователях
-	users, err := s.store.GetDevices(appId, message.Users...)
+	users, err := s.store.GetDevices(appID, message.Users...)
 	if err != nil {
 		return http.StatusInternalServerError, err.Error()
 	}
@@ -139,15 +139,15 @@ func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.R
 		return http.StatusOK, errors.New("no registered users")
 	}
 	// отсылаем push-уведомления
-	for bundleId, push := range message.Messages {
+	for bundleID, push := range message.Messages {
 		if push == nil || push.Payload == nil || len(push.Payload) == 0 {
-			log.Println("Empty push-message:", bundleId)
+			log.Println("Empty push-message:", bundleID)
 			continue // игнорируем пустые сообщения
 		}
 		// получаем информацию о конфигурации для данного приложения
-		var config = s.config.Apps[appId][bundleId]
+		var config = s.config.Apps[appID][bundleID]
 		if config == nil {
-			log.Println("Ignore:", bundleId)
+			log.Println("Ignore:", bundleID)
 			continue // игнорируем ошибочные идентификаторы приложения
 		}
 		switch config.Type {
@@ -155,20 +155,20 @@ func (s *HTTPService) PushMessage(appId string, w http.ResponseWriter, r *http.R
 			// собираем все токены от всех пользователей для данного приложения
 			var tokens = make([]string, 0)
 			for _, devices := range users {
-				if toks := devices[bundleId]; len(toks) > 0 {
+				if toks := devices[bundleID]; len(toks) > 0 {
 					tokens = append(tokens, toks...)
 				}
 			}
 			// проверяем, что клиент для отправки определен
 			if config.apnsClient == nil {
-				return http.StatusInternalServerError, fmt.Errorf("client for %q not initialized", bundleId)
+				return http.StatusInternalServerError, fmt.Errorf("client for %q not initialized", bundleID)
 			}
 			// отправляем сообщения
 			if err := config.apnsClient.Send(push, tokens...); err != nil {
 				return http.StatusInternalServerError, err
 			}
 		default:
-			log.Println("Ignore not APNS:", bundleId)
+			log.Println("Ignore not APNS:", bundleID)
 			continue // TODO: убрать ограничение по типу
 		}
 	}
