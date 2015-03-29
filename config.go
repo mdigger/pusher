@@ -5,7 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
+
+	"github.com/alexjlockwood/gcm"
 
 	"github.com/mdigger/apns"
 )
@@ -29,8 +32,14 @@ type Bundle struct {
 	Certificate [][]byte `json:"certificate"`
 	// приватный ключ
 	PrivateKey []byte `json:"privateKey"`
+	// ключ для отсылки GCM
+	ApiKey string `json:"apiKey"`
 	// клиент для отсылки уведомлений
 	apnsClient *apns.Client
+	// конфигурация для подключения к APNS
+	apnsConfig *apns.Config
+	// клиент для отправки GCM
+	gcmClient *gcm.Sender
 }
 
 // LoadConfig читает конфигурационный файл и возвращает его описание.
@@ -56,7 +65,8 @@ func LoadConfig(filename string) (*Config, error) {
 	// инициализируем клиентов для всех приложений
 	for _, bundles := range config.Apps {
 		for _, bundle := range bundles {
-			if bundle.Type == "apns" {
+			switch bundle.Type {
+			case "apns":
 				cert, err := tls.X509KeyPair(
 					bytes.Join(bundle.Certificate, []byte{'\n'}), bundle.PrivateKey)
 				if err != nil {
@@ -68,7 +78,13 @@ func LoadConfig(filename string) (*Config, error) {
 					Certificate: cert,
 				}
 				conf.SetLogger(nil)
+				bundle.apnsConfig = conf
 				bundle.apnsClient = apns.NewClient(conf)
+			case "gcm":
+				bundle.gcmClient = &gcm.Sender{
+					ApiKey: bundle.ApiKey,
+					Http:   http.DefaultClient,
+				}
 			}
 		}
 	}

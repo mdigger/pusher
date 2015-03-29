@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/alexjlockwood/gcm"
+	"github.com/mdigger/apns"
 )
 
 // Handle описывает формат обработчика HTTP-запросов, поддерживаемый сервером.
@@ -140,36 +143,71 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 	}
 	// отсылаем push-уведомления
 	for bundleID, push := range message.Messages {
-		if push == nil || push.Payload == nil || len(push.Payload) == 0 {
-			log.Println("Empty push-message:", bundleID)
-			continue // игнорируем пустые сообщения
+		if push == nil {
+			return http.StatusBadRequest, fmt.Errorf("empty message for %q", bundleID)
 		}
 		// получаем информацию о конфигурации для данного приложения
 		var config = s.config.Apps[appID][bundleID]
 		if config == nil {
-			log.Println("Ignore:", bundleID)
-			continue // игнорируем ошибочные идентификаторы приложения
+			return http.StatusBadRequest, fmt.Errorf("unknown bundle id %q", bundleID)
+		}
+		// собираем все токены от всех пользователей для данного приложения
+		var tokens = make([]string, 0)
+		for _, devices := range users {
+			if toks := devices[bundleID]; len(toks) > 0 {
+				tokens = append(tokens, toks...)
+			}
+		}
+		if len(tokens) == 0 {
+			continue // игнорируем отправку сообщений, когда некому посылать
 		}
 		switch config.Type {
 		case "apns":
-			// собираем все токены от всех пользователей для данного приложения
-			var tokens = make([]string, 0)
-			for _, devices := range users {
-				if toks := devices[bundleID]; len(toks) > 0 {
-					tokens = append(tokens, toks...)
-				}
-			}
 			// проверяем, что клиент для отправки определен
 			if config.apnsClient == nil {
 				return http.StatusInternalServerError, fmt.Errorf("client for %q not initialized", bundleID)
 			}
+			var notification = new(apns.Notification)
+			if err = json.Unmarshal(push, notification); err != nil {
+				return http.StatusBadRequest, fmt.Errorf("bad message format for %q: %s", bundleID, err)
+			}
+			if notification.Payload == nil || len(notification.Payload) == 0 {
+				return http.StatusBadRequest, fmt.Errorf("bad empty message for %q", bundleID)
+			}
 			// отправляем сообщения
-			if err := config.apnsClient.Send(push, tokens...); err != nil {
+			if err := config.apnsClient.Send(notification, tokens...); err != nil {
 				return http.StatusInternalServerError, err
 			}
+		case "gcm":
+			if config.gcmClient == nil {
+				return http.StatusInternalServerError, fmt.Errorf("client for %q not initialized", bundleID)
+			}
+			var msg = new(gcm.Message)
+			if err = json.Unmarshal(push, msg); err != nil {
+				return http.StatusBadRequest, fmt.Errorf("bad message format for %q: %s", bundleID, err)
+			}
+			if msg.Data == nil || len(msg.Data) == 0 {
+				return http.StatusBadRequest, fmt.Errorf("bad empty message for %q", bundleID)
+			}
+			for len(tokens) > 0 {
+				var toks []string
+				if len(tokens) > 1000 {
+					toks = tokens[:1000]
+					tokens = tokens[1000:]
+				} else {
+					toks = tokens
+					tokens = []string{}
+				}
+				msg.RegistrationIDs = toks
+				response, err := config.gcmClient.Send(msg, 3)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				_ = response
+			}
 		default:
-			log.Println("Ignore not APNS:", bundleID)
-			continue // TODO: убрать ограничение по типу
+			log.Printf("Ignore unknown %q type", bundleID)
+			continue
 		}
 	}
 	return http.StatusOK, http.StatusText(http.StatusOK)

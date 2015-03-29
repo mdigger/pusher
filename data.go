@@ -1,8 +1,6 @@
 package pusher
 
-import (
-	"github.com/mdigger/apns"
-)
+import "encoding/json"
 
 // DeviceRegister описывает информацию для регистрации нового токена устройства пользователя.
 type DeviceRegister struct {
@@ -14,9 +12,9 @@ type DeviceRegister struct {
 
 // PushMessage описывает информацию для отправки push-уведомления.
 type PushMessage struct {
-	App      string                        `json:"-"`        // идентификатор сервиса
-	Users    []string                      `json:"users"`    // идентификаторы пользователей
-	Messages map[string]*apns.Notification `json:"messages"` // сообщение для отправки с привязкой к идентификаторам приложения
+	App      string                     `json:"-"`        // идентификатор сервиса
+	Users    []string                   `json:"users"`    // идентификаторы пользователей
+	Messages map[string]json.RawMessage `json:"messages"` // сообщение для отправки с привязкой к идентификаторам приложения
 }
 
 // Devices описывает список токенов устройств по идентификаторам приложений.
