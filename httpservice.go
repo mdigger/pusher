@@ -78,12 +78,14 @@ func handleWithData(appID string, handle Handle) http.HandlerFunc {
 		}
 		jsonData, err := json.MarshalIndent(data, "", "  ")
 		if err != nil {
+			log.Printf("Error:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; encoding=utf-8")
 		w.WriteHeader(code)
 		w.Write(jsonData)
+		log.Printf("OK:", code, string(jsonData))
 	}
 }
 
@@ -159,6 +161,7 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 			}
 		}
 		if len(tokens) == 0 {
+			log.Println("No tokens")
 			continue // игнорируем отправку сообщений, когда некому посылать
 		}
 		switch config.Type {
@@ -175,6 +178,7 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 				return http.StatusBadRequest, fmt.Errorf("bad empty message for %q", bundleID)
 			}
 			// отправляем сообщения
+			log.Println("Push APNS to tokens: %s", strings.Join(tokens, ", "))
 			if err := config.apnsClient.Send(notification, tokens...); err != nil {
 				return http.StatusInternalServerError, err
 			}

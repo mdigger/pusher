@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/mdigger/pusher"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/mdigger/pusher"
 )
 
 func main() {
-	config, err := pusher.LoadConfig("pusher.json") // Читаем конфигурационный файл
+	config, err := pusher.LoadConfig(os.Args[0] + ".json") // Читаем конфигурационный файл
 	if err != nil {
 		log.Fatalln("Error loading config:", err)
 	}

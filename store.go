@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+	"strings"
 
 	"github.com/boltdb/bolt"
 )
@@ -55,6 +56,7 @@ func (s *Store) Backup() {
 
 // AddDevice добавляет в хранилище информацию об идентификаторе устройства пользователя приложения.
 func (s *Store) AddDevice(app, bundle, user, token string) error {
+	log.Printf("AddDevice: [%s] %s %s %s", app, bundle, user, token)
 	return s.db.Batch(func(tx *bolt.Tx) error {
 		// открываем коллекцию данных приложения
 		bucket, err := tx.CreateBucketIfNotExists([]byte(app))
@@ -84,6 +86,7 @@ func (s *Store) AddDevice(app, bundle, user, token string) error {
 
 // GetDevices возвращает для каждого пользователя список зарегистрированных для него устройств.
 func (s *Store) GetDevices(app string, users ...string) (map[string]Devices, error) {
+	log.Printf("GetDevices: [%s] %s", app, strings.Join(users, ", "))
 	var result = make(map[string]Devices, len(users))
 	err := s.db.View(func(tx *bolt.Tx) error {
 		// открываем коллекцию данных приложения
