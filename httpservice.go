@@ -178,7 +178,7 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 				return http.StatusBadRequest, fmt.Errorf("bad empty message for %q", bundleID)
 			}
 			// отправляем сообщения
-			log.Println("Push APNS to tokens: %s", strings.Join(tokens, ", "))
+			log.Println("Push APNS to tokens:", strings.Join(tokens, ", "))
 			if err := config.apnsClient.Send(notification, tokens...); err != nil {
 				return http.StatusInternalServerError, err
 			}
