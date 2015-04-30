@@ -78,14 +78,14 @@ func handleWithData(appID string, handle Handle) http.HandlerFunc {
 		}
 		jsonData, err := json.MarshalIndent(data, "", "  ")
 		if err != nil {
-			log.Printf("Error:", err)
+			log.Println("Error:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; encoding=utf-8")
 		w.WriteHeader(code)
 		w.Write(jsonData)
-		log.Printf("OK:", code, string(jsonData))
+		log.Println("OK:", code, string(jsonData))
 	}
 }
 
