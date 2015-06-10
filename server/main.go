@@ -25,7 +25,8 @@ func main() {
 	}
 	defer httpservice.Close() // закрываем по окончании
 	log.Println("Running", config.Server)
-	var dir = filepath.Dir(filename) // текущий каталог
+	var currentDir = filepath.Dir(os.Args[0]) // текущий каталог
+	// стартуем сервис HTTP
 	log.Fatal(http.ListenAndServeTLS(config.Server,
-		filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem"), mux)) // стартуем сервис HTTP
+		filepath.Join(currentDir, "cert.pem"), filepath.Join(currentDir, "key.pem"), mux))
 }
