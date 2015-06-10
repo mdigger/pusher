@@ -25,11 +25,13 @@ func main() {
 	}
 	defer httpservice.Close() // закрываем по окончании
 	if config.ServerTLS != "" {
-		var currentDir = filepath.Dir(os.Args[0]) // текущий каталог
-		// стартуем сервис HTTP
-		log.Println("Running TLS", config.ServerTLS)
-		go log.Fatal(http.ListenAndServeTLS(config.ServerTLS,
-			filepath.Join(currentDir, "cert.pem"), filepath.Join(currentDir, "key.pem"), mux))
+		go func() {
+			var currentDir = filepath.Dir(os.Args[0]) // текущий каталог
+			// стартуем сервис HTTP
+			log.Println("Running TLS", config.ServerTLS)
+			log.Fatal(http.ListenAndServeTLS(config.ServerTLS,
+				filepath.Join(currentDir, "cert.pem"), filepath.Join(currentDir, "key.pem"), mux))
+		}()
 	}
 	log.Println("Running", config.Server)
 	log.Fatal(http.ListenAndServe(config.Server, mux))
