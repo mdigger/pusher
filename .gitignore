@@ -6,3 +6,5 @@ server/server
 *.zip
 
 *.bak
+
+server/server.json

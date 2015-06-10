@@ -4,12 +4,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/mdigger/pusher"
 )
 
 func main() {
-	config, err := pusher.LoadConfig(os.Args[0] + ".json") // Читаем конфигурационный файл
+	var filename = os.Args[0]
+	if ext := filepath.Ext(filename); ext != "" {
+		filename = filename[:len(filename)-len(ext)]
+	}
+	config, err := pusher.LoadConfig(filename + ".json") // Читаем конфигурационный файл
 	if err != nil {
 		log.Fatalln("Error loading config:", err)
 	}
@@ -20,5 +25,7 @@ func main() {
 	}
 	defer httpservice.Close() // закрываем по окончании
 	log.Println("Running", config.Server)
-	log.Fatal(http.ListenAndServeTLS(config.Server, "cert.pem", "key.pem", mux)) // стартуем сервис HTTP
+	var dir = filepath.Dir(filename) // текущий каталог
+	log.Fatal(http.ListenAndServeTLS(config.Server,
+		filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem"), mux)) // стартуем сервис HTTP
 }
