@@ -20,5 +20,5 @@ func main() {
 	}
 	defer httpservice.Close() // закрываем по окончании
 	log.Println("Running", config.Server)
-	log.Fatal(http.ListenAndServe(config.Server, mux)) // стартуем сервис HTTP
+	log.Fatal(http.ListenAndServeTLS(config.Server, "cert.pem", "key.pem", mux)) // стартуем сервис HTTP
 }
