@@ -14,7 +14,7 @@ func TestDB(t *testing.T) {
 	if err := store.AddDevice("app", "bundle", "user2", "token"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.GetDevices("app", "user1"); err != nil {
+	if _, err := store.GetDevices("app", "user1", "user2"); err != nil {
 		t.Fatal(err)
 	}
 }

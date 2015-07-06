@@ -90,7 +90,7 @@ func (s *Store) AddDevice(app, bundle, user, token string) error {
 // GetDevices возвращает для каждого пользователя список зарегистрированных для него устройств.
 func (s *Store) GetDevices(app string, users ...string) (map[string]Devices, error) {
 	log.Printf("GetDevices: [%s] %s", app, strings.Join(users, ", "))
-	result := make(map[string]Devices, len(users))
+	var result = make(map[string]Devices, len(users))
 	for _, user := range users {
 		rows, err := s.db.Query(`SELECT bundle, token FROM devices WHERE app == $1 AND user == $2`, app, user)
 		if err != nil {
