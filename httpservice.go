@@ -157,13 +157,13 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 	if len(message.Users) == 0 {
 		return http.StatusBadRequest, errors.New("no users")
 	}
-	// получаем информацию о пользователях
-	users, err := s.store.GetDevices(appID, message.Users...)
+	// // получаем информацию о токенах устройст указанных пользователей, сгруппированный по бандлам
+	devices, err := s.store.GetDevices(appID, message.Users...)
 	if err != nil {
 		return http.StatusInternalServerError, err.Error()
 	}
-	if len(users) == 0 {
-		return http.StatusOK, errors.New("no registered users")
+	if len(devices) == 0 {
+		return http.StatusOK, errors.New("no registered users or devices")
 	}
 	// отсылаем push-уведомления
 	for bundleID, push := range message.Messages {
@@ -176,14 +176,9 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 			return http.StatusBadRequest, fmt.Errorf("unknown bundle id %q", bundleID)
 		}
 		// собираем все токены от всех пользователей для данного приложения
-		var tokens = make([]string, 0)
-		for _, devices := range users {
-			if toks := devices[bundleID]; len(toks) > 0 {
-				tokens = append(tokens, toks...)
-			}
-		}
+		var tokens = devices[bundleID]
 		if len(tokens) == 0 {
-			log.Println("No tokens")
+			log.Println("No tokens for", bundleID)
 			continue // игнорируем отправку сообщений, когда некому посылать
 		}
 		switch config.Type {

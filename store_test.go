@@ -1,6 +1,10 @@
 package pusher
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestDB(t *testing.T) {
 	store, err := OpenStore("test.db")
@@ -14,7 +18,11 @@ func TestDB(t *testing.T) {
 	if err := store.AddDevice("app", "bundle", "user2", "token"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.GetDevices("app", "user1", "user2"); err != nil {
+	devices, err := store.GetDevices("app", "user1", "user2")
+	if err != nil {
 		t.Fatal(err)
+	}
+	for bundle, tokens := range devices {
+		fmt.Println(bundle, strings.Join(tokens, ", "))
 	}
 }
