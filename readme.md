@@ -11,23 +11,29 @@
 
 ## Конфигурация
 
-Конфигурация описывается в файле `pusher.json`. Например:
+Конфигурация описывается в файле `server.json`. Например:
 
 	{
 		"db": "users.db",
 		"server": "localhost:8080",
 		"apps": {
-			"push-test": {
-				"com.xyzrd.PushTest": {
-					"type": "apns",
-					"sandbox": true,
-					"certificate": [
-					"LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZpVENDQkhHZ0F3SUJBZ0lJR01vWi8wSlhScU13RFFZSktvWklodmNOQ
-					...kUQpLM3IxUmZNUE4wajFUeXlaVjRkSXVZbE5mbHRWczBrR1hha3ozL1U9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
-					"LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZpRENDQkhDZ0F3SUJBZ0lJVUJCazhHczBCbnd3RFFZSktvWklodmNOQ
-					...PWgp1OExUNVI2RXB2SUxlVDVvNUZTRzluNk94UGZFcTRBSGNnUERtZz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K"
-					],
-					"privateKey": "LS0tLNVI2RXS1FCRUdJTiBSU0EgUFJJVkFURSBLRVktLS0t...RCBSU0EgUFJJVkFURSBLRVktLS0tLQo="
+			"keys": [
+				"123",
+				"321"
+			],
+			"bundles": {
+				"push-test": {
+					"com.xyzrd.PushTest": {
+						"type": "apns",
+						"sandbox": true,
+						"certificate": [
+						"LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZpVENDQkhHZ0F3SUJBZ0lJR01vWi8wSlhScU13RFFZSktvWklodmNOQ
+						...kUQpLM3IxUmZNUE4wajFUeXlaVjRkSXVZbE5mbHRWczBrR1hha3ozL1U9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+						"LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZpRENDQkhDZ0F3SUJBZ0lJVUJCazhHczBCbnd3RFFZSktvWklodmNOQ
+						...PWgp1OExUNVI2RXB2SUxlVDVvNUZTRzluNk94UGZFcTRBSGNnUERtZz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K"
+						],
+						"privateKey": "LS0tLNVI2RXS1FCRUdJTiBSU0EgUFJJVkFURSBLRVktLS0t...RCBSU0EgUFJJVkFURSBLRVktLS0tLQo="
+					}
 				}
 			}
 		}
@@ -35,8 +41,9 @@
 
 - `db` -- имя файла с базой данных (создастся автоматически, если нет). По умолчанию `pusher.db` (можно опустить).
 - `server` -- адрес и порт на котором будет запущен сервер. По умолчанию `localhost:8080` (можно опустить).
-- `apps` -- список поддерживаемых сервисов (имена используются как часть URL в запросе). 
-- далее идет список **bundleId** приложений. В данном примере это `com.xyzrd.PushTest`.
+- `apps` -- список поддерживаемых сервисов (имена используются как часть URL в запросе).
+- `keys` -- описывает массив токенов, требующихся для авторизации при любом запросе к приложению. Если список пустой или не определен, то авторизация не проверяется
+- `bundles` -- содержит список **bundleId** приложений. В данном примере это `com.xyzrd.PushTest`.
 - внутри -- описание конфигурации для подключения, включая сертификаты.
 
 ## Генерация конфигурационного описания
@@ -87,6 +94,10 @@
 	[
 	  "com.xyzrd.PushTest"
 	]
+
+Если приложение требует авторизации, то его необходимо передать в авторизационном заголовке:
+
+	curl -k -H "Authorization: Token abcdabcd" https://localhost:8080/messagetrack
 
 Для регистрации пользователей и привязки токенов устройств можно воспользоваться следующим запросом:
 
