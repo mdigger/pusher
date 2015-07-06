@@ -12,6 +12,8 @@ import (
 	"github.com/mdigger/apns"
 )
 
+const tokenName = "Token "
+
 // Handle описывает формат обработчика HTTP-запросов, поддерживаемый сервером.
 type Handle func(string, http.ResponseWriter, *http.Request) (int, interface{})
 
@@ -36,18 +38,18 @@ func NewHTTPService(config *Config, mux *http.ServeMux) (*HTTPService, error) {
 		store:  store,
 		config: config,
 	}
-	mux.HandleFunc("/", handleWithData("root", service.GetApps))
+	mux.HandleFunc("/", service.handleWithData("", service.GetApps))
 	for appID := range config.Apps {
-		mux.HandleFunc(fmt.Sprintf("/%s", appID), handleWithData(appID, service.GetBundles))
-		mux.HandleFunc(fmt.Sprintf("/%s/register", appID), handleWithData(appID, service.RegisterDevice))
-		mux.HandleFunc(fmt.Sprintf("/%s/push", appID), handleWithData(appID, service.PushMessage))
+		mux.HandleFunc(fmt.Sprintf("/%s", appID), service.handleWithData(appID, service.GetBundles))
+		mux.HandleFunc(fmt.Sprintf("/%s/register", appID), service.handleWithData(appID, service.RegisterDevice))
+		mux.HandleFunc(fmt.Sprintf("/%s/push", appID), service.handleWithData(appID, service.PushMessage))
 	}
 	return service, nil
 }
 
 // handleWithData принимает все запросы к сервису и отвечает за их разбор и вывод информации.
 // Это промежуточный слой, выполняемый для всех запросов к сервису.
-func handleWithData(appID string, handle Handle) http.HandlerFunc {
+func (s *HTTPService) handleWithData(appID string, handle Handle) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "POST", "PUT": // поддерживаем только эти типы запросов
@@ -56,7 +58,7 @@ func handleWithData(appID string, handle Handle) http.HandlerFunc {
 				http.Error(w, http.StatusText(http.StatusUnsupportedMediaType), http.StatusUnsupportedMediaType)
 				return
 			}
-		case "GET":
+		case "GET": // тоже поддерживаем
 
 		default: // остальные типы запросов не поддерживаются
 			w.Header().Set("Allow", "POST,PUT")
@@ -64,6 +66,26 @@ func handleWithData(appID string, handle Handle) http.HandlerFunc {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
+
+		// проверка авторизации приложений
+		if appID != "" && len(s.config.Apps[appID].Keys) > 0 {
+			auth := r.Header.Get("Authorization") // получаем из заголовка авторизационную информацию
+			if auth == "" || !strings.HasPrefix(auth, tokenName) {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
+			auth = strings.TrimSpace(strings.TrimPrefix(auth, tokenName)) // избавляемся от префикса Token
+			for _, appKey := range s.config.Apps[appID].Keys {
+				if appKey == auth {
+					goto Next
+				}
+			}
+			// ни один ключ из конфигурации приложения не совпал
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+
+	Next:
 		code, data := handle(appID, w, r) // вызываем оригинальный обработчик запроса
 		switch code {
 		case http.StatusOK, http.StatusInternalServerError, http.StatusBadRequest:
@@ -85,7 +107,7 @@ func handleWithData(appID string, handle Handle) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json; encoding=utf-8")
 		w.WriteHeader(code)
 		w.Write(jsonData)
-		log.Println("OK:", code, string(jsonData))
+		//log.Println("OK:", code, string(jsonData))
 	}
 }
 
@@ -100,8 +122,8 @@ func (s *HTTPService) GetApps(_ string, w http.ResponseWriter, r *http.Request) 
 
 // GetBundles возвращает список приложений, поддерживаемых данным сервисом.
 func (s *HTTPService) GetBundles(appID string, w http.ResponseWriter, r *http.Request) (int, interface{}) {
-	result := make([]string, 0, len(s.config.Apps[appID]))
-	for app := range s.config.Apps[appID] {
+	result := make([]string, 0, len(s.config.Apps[appID].Bundles))
+	for app := range s.config.Apps[appID].Bundles {
 		result = append(result, app)
 	}
 	return http.StatusOK, result
@@ -149,7 +171,7 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 			return http.StatusBadRequest, fmt.Errorf("empty message for %q", bundleID)
 		}
 		// получаем информацию о конфигурации для данного приложения
-		var config = s.config.Apps[appID][bundleID]
+		var config = s.config.Apps[appID].Bundles[bundleID]
 		if config == nil {
 			return http.StatusBadRequest, fmt.Errorf("unknown bundle id %q", bundleID)
 		}

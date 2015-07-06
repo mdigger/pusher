@@ -9,24 +9,15 @@ import (
 	"os"
 
 	"github.com/alexjlockwood/gcm"
-
 	"github.com/mdigger/apns"
 )
-
-// Config описывает настройки сервера.
-type Config struct {
-	DB        string                        `json:"db"`        // имя файла с хранилищем
-	Server    string                        `json:"server"`    // адрес и порт для запуска сервиса
-	ServerTLS string                        `json:"serverTLS"` // адрес и порт для запуска сервиса
-	Apps      map[string]map[string]*Bundle `json:"apps"`      // список поддерживаемых приложений с разбиением по bundleId
-}
 
 // Bundle описывает информацию для подключения к сервису.
 type Bundle struct {
 	// тип соединения: должно быть "apns"
 	Type string `json:"type"`
 	// идентификатор приложения
-	BundleID string `json:"bundleId"`
+	BundleID string `json:"-"`
 	// флаг соединения с отладочным сервером
 	Sandbox bool `json:"sandbox,omitempty"`
 	// сертификаты TLS
@@ -41,6 +32,20 @@ type Bundle struct {
 	apnsConfig *apns.Config
 	// клиент для отправки GCM
 	gcmClient *gcm.Sender
+}
+
+// App описывает информацию о параметрах приложения.
+type App struct {
+	Name    string             `json:"-"`       // название приложения
+	Keys    []string           `json:"keys"`    // список ключей для авторизации
+	Bundles map[string]*Bundle `json:"bundles"` // список поддерживаемых бандлов
+}
+
+// Config описывает настройки сервера.
+type Config struct {
+	DB     string          `json:"db"`     // имя файла с хранилищем
+	Server string          `json:"server"` // адрес и порт для запуска сервиса
+	Apps   map[string]*App `json:"apps"`   // список поддерживаемых приложений
 }
 
 // LoadConfig читает конфигурационный файл и возвращает его описание.
@@ -64,8 +69,11 @@ func LoadConfig(filename string) (*Config, error) {
 		config.Server = "localhost:8080" // адрес и порт сервиса по умолчанию
 	}
 	// инициализируем клиентов для всех приложений
-	for _, bundles := range config.Apps {
-		for _, bundle := range bundles {
+	for appName, app := range config.Apps {
+		app.Name = appName // сохраняем имя приложения
+		// перебираем все бандлы
+		for bundleName, bundle := range app.Bundles {
+			bundle.BundleID = bundleName
 			switch bundle.Type {
 			case "apns":
 				cert, err := tls.X509KeyPair(
