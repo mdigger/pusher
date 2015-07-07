@@ -14,31 +14,22 @@ import (
 
 // Bundle описывает информацию для подключения к сервису.
 type Bundle struct {
-	// тип соединения: должно быть "apns"
-	Type string `json:"type"`
-	// идентификатор приложения
-	BundleID string `json:"-"`
-	// флаг соединения с отладочным сервером
-	Sandbox bool `json:"sandbox,omitempty"`
-	// сертификаты TLS
-	Certificate [][]byte `json:"certificate"`
-	// приватный ключ
-	PrivateKey []byte `json:"privateKey"`
-	// ключ для отсылки GCM
-	ApiKey string `json:"apiKey"`
-	// клиент для отсылки уведомлений
-	apnsClient *apns.Client
-	// конфигурация для подключения к APNS
-	apnsConfig *apns.Config
-	// клиент для отправки GCM
-	gcmClient *gcm.Sender
+	Type        string       `json:"type"`              // тип соединения: должно быть "apns"
+	BundleID    string       `json:"-"`                 // идентификатор приложения
+	Sandbox     bool         `json:"sandbox,omitempty"` // флаг соединения с отладочным сервером
+	Certificate [][]byte     `json:"certificate"`       // сертификаты TLS
+	PrivateKey  []byte       `json:"privateKey"`        // приватный ключ
+	ApiKey      string       `json:"apiKey"`            // ключ для отсылки GCM
+	apnsClient  *apns.Client // клиент для отсылки уведомлений
+	apnsConfig  *apns.Config // конфигурация для подключения к APNS
+	gcmClient   *gcm.Sender  // клиент для отправки GCM
 }
 
 // App описывает информацию о параметрах приложения.
 type App struct {
-	Name    string             `json:"-"`       // название приложения
-	Keys    []string           `json:"keys"`    // список ключей для авторизации
-	Bundles map[string]*Bundle `json:"bundles"` // список поддерживаемых бандлов
+	Name    string             `json:"-"`              // название приложения
+	Keys    []string           `json:"keys,omitempty"` // список ключей для авторизации
+	Bundles map[string]*Bundle `json:"bundles"`        // список поддерживаемых бандлов
 }
 
 // Config описывает настройки сервера.

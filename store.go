@@ -2,7 +2,9 @@ package pusher
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"log"
+	"os"
 	"strings"
 
 	_ "github.com/cznic/ql/driver"
@@ -50,24 +52,43 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// Backup сохраняет копию базы данных.
-func (s *Store) Backup() {
-	// if s.db == nil {
-	// 	return
-	// }
-	// var name = s.db.Path()
-	// if name == "" {
-	// 	return // база закрыта
-	// }
-	// s.db.View(func(tx *bolt.Tx) error {
-	// 	// делаем копию файла
-	// 	if err := tx.CopyFile(name+".bak", 0666); err != nil {
-	// 		log.Printf("Error database backup: %v", err)
-	// 		return err
-	// 	}
-	// 	log.Printf("DB Size: %d", tx.Size())
-	// 	return nil
-	// })
+// Backup сохраняет копию базы данных в формате CSV
+func (s *Store) Backup(filename string) error {
+	if s.db == nil {
+		return nil
+	}
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	var csvWriter = csv.NewWriter(file)
+	defer csvWriter.Flush()
+	rows, err := s.db.Query(`SELECT app, bundle, user, token FROM devices ORDER BY app, bundle, user`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	if err := csvWriter.Write(cols); err != nil {
+		return err
+	}
+	for rows.Next() {
+		var app, bundle, user, token string
+		if err := rows.Scan(&app, &bundle, &user, &token); err != nil {
+			return err
+		}
+		if err := csvWriter.Write([]string{app, bundle, user, token}); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddDevice добавляет в хранилище информацию об идентификаторе устройства пользователя приложения.
@@ -96,6 +117,7 @@ func (s *Store) GetDevices(app string, users ...string) (map[string][]string, er
 		if err != nil {
 			return result, err
 		}
+		defer rows.Close()
 		for rows.Next() {
 			var bundle, token string
 			if err := rows.Scan(&bundle, &token); err != nil {

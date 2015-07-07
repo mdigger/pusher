@@ -1,12 +1,9 @@
-
 *.db
-
-server/server
-
 *.zip
-
 *.bak
-
-server/server.json
-
+*.csv
+# server/server.json
 .f969b29ca0626c75276dfa7e222b141095d7f45b
+ql
+server/server
+server/.*

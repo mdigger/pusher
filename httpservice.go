@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/alexjlockwood/gcm"
 	"github.com/mdigger/apns"
@@ -34,10 +35,20 @@ func NewHTTPService(config *Config, mux *http.ServeMux) (*HTTPService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
 	}
+	// Backup каждые 12 часов
+	go func() {
+		for {
+			if err := store.Backup(config.DB + ".csv"); err != nil {
+				log.Println("Backup Error:", err)
+			}
+			time.Sleep(time.Hour * 12)
+		}
+	}()
 	service := &HTTPService{
 		store:  store,
 		config: config,
 	}
+	// регистрируем обработчики HTTP-запросов
 	mux.HandleFunc("/", service.handleWithData("", service.GetApps))
 	for appID := range config.Apps {
 		mux.HandleFunc(fmt.Sprintf("/%s", appID), service.handleWithData(appID, service.GetBundles))
@@ -87,9 +98,7 @@ func (s *HTTPService) handleWithData(appID string, handle Handle) http.HandlerFu
 
 	Next:
 		code, data := handle(appID, w, r) // вызываем оригинальный обработчик запроса
-		switch code {
-		case http.StatusOK, http.StatusInternalServerError, http.StatusBadRequest:
-		default:
+		if code < 200 {
 			code = http.StatusInternalServerError
 		}
 		if str, ok := data.(string); ok {
@@ -98,7 +107,7 @@ func (s *HTTPService) handleWithData(appID string, handle Handle) http.HandlerFu
 				"status": str,
 			}
 		}
-		jsonData, err := json.MarshalIndent(data, "", "  ")
+		jsonData, err := json.MarshalIndent(data, "", "\t")
 		if err != nil {
 			log.Println("Error:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
