@@ -50,10 +50,36 @@ func NewHTTPService(config *Config, mux *http.ServeMux) (*HTTPService, error) {
 	}
 	// регистрируем обработчики HTTP-запросов
 	mux.HandleFunc("/", service.handleWithData("", service.GetApps))
-	for appID := range config.Apps {
+	for appID, app := range config.Apps {
 		mux.HandleFunc(fmt.Sprintf("/%s", appID), service.handleWithData(appID, service.GetBundles))
 		mux.HandleFunc(fmt.Sprintf("/%s/register", appID), service.handleWithData(appID, service.RegisterDevice))
 		mux.HandleFunc(fmt.Sprintf("/%s/push", appID), service.handleWithData(appID, service.PushMessage))
+		// перебираем все бандлы
+		for bundleName, bundle := range app.Bundles {
+			if bundle.Type != "apns" {
+				continue // игнорируем все не APNS
+			}
+			// запускаем feedback сервисы
+			go func(appID, bundleName string, bundle *Bundle) {
+				for {
+					feedbacks, err := apns.Feedback(bundle.apnsConfig)
+					if err != nil {
+						log.Printf("Feedback error: [%s] %s %v", appID, bundleName, err)
+						time.Sleep(time.Hour)
+						continue
+					}
+					if len(feedbacks) > 0 {
+						log.Printf("Feedback to delete: [%s] %s - %d", appID, bundleName, len(feedbacks))
+					}
+					for _, fb := range feedbacks {
+						if err := store.DelDevice(appID, bundleName, fb.String()); err != nil {
+							log.Printf("Delete error: [%s] %s %v", appID, bundleName, err)
+						}
+					}
+					time.Sleep(time.Hour * 24)
+				}
+			}(appID, bundleName, bundle)
+		}
 	}
 	return service, nil
 }

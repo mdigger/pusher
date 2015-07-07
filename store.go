@@ -136,3 +136,18 @@ func (s *Store) GetDevices(app string, users ...string) (map[string][]string, er
 	}
 	return result, nil
 }
+
+func (s *Store) DelDevice(app, bundle, token string) error {
+	log.Printf("DelDevice: [%s] %s %s", app, bundle, token)
+	tx, err := s.db.Begin() // открываем новую транзакцию
+	if err != nil {
+		return err
+	}
+	// удаляем предыдущую запись с таким токеным и добавляем новую
+	if _, err := tx.Exec(
+		`DELETE FROM devices WHERE app == $1 AND bundle == $2 AND token == $3;`,
+		app, bundle, token); err != nil {
+		return err
+	}
+	return tx.Commit() // завершаем транзакцию
+}
