@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/alexjlockwood/gcm"
 	"github.com/mdigger/apns"
@@ -56,6 +57,8 @@ func LoadConfig(filename string) (*Config, error) {
 	if config.DB == "" {
 		config.DB = "pusher.db" // имя файла с базой по умолчанию
 	}
+	// учитываем расположение файла конфигурации
+	config.DB = filepath.Join(filepath.Dir(filename), config.DB)
 	if config.Server == "" {
 		config.Server = "localhost:8080" // адрес и порт сервиса по умолчанию
 	}
