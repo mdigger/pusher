@@ -192,7 +192,7 @@ func (s *HTTPService) PushMessage(appID string, w http.ResponseWriter, r *http.R
 	if len(message.Users) == 0 {
 		return http.StatusBadRequest, errors.New("no users")
 	}
-	// // получаем информацию о токенах устройст указанных пользователей, сгруппированный по бандлам
+	// // получаем информацию о токенах устройств указанных пользователей, сгруппированный по бандлам
 	devices, err := s.store.GetDevices(appID, message.Users...)
 	if err != nil {
 		return http.StatusInternalServerError, err.Error()

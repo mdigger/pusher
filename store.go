@@ -111,7 +111,7 @@ func (s *Store) AddDevice(app, bundle, user, token string) error {
 // GetDevices возвращает для каждого пользователя список зарегистрированных для него устройств.
 func (s *Store) GetDevices(app string, users ...string) (map[string][]string, error) {
 	log.Printf("GetDevices: [%s] %s", app, strings.Join(users, ", "))
-	var result = make(map[string][]string, len(users))
+	var result = make(map[string][]string)
 	for _, user := range users {
 		rows, err := s.db.Query(`SELECT bundle, token FROM devices WHERE app == $1 AND user == $2`, app, user)
 		if err != nil {
@@ -123,9 +123,9 @@ func (s *Store) GetDevices(app string, users ...string) (map[string][]string, er
 			if err := rows.Scan(&bundle, &token); err != nil {
 				return result, err
 			}
-			log.Printf("> %s: %s = %s\n", user, bundle, token)
+			// log.Printf("> %s: %s = %s\n", user, bundle, token)
 			if tokens, ok := result[bundle]; ok {
-				tokens = append(tokens, token)
+				result[bundle] = append(tokens, token)
 			} else {
 				result[bundle] = []string{token}
 			}
