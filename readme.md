@@ -2,29 +2,28 @@
 
 ## Service params
 
-	$ ./pusher --help
-	# Pusher 2.0.27 [git 38cabcb] (2016-09-01)
-	Usage of ./pusher2:
+	# Pusher 2.0.27 [git 290d97b] (2016-09-07)
+	Usage of ./pusher:
 	  -addr port
-	       	http server address and port (default ":8443")
-	  -cert file
-	       	server certificate file (default "cert.pem")
+	    	http server address and port (default ":https")
+	  -cache folder
+	    	letsencrypt cache folder (default "letsencrypt.cache")
 	  -compress
-	       	gzip compress response (default true)
+	    	gzip compress response (default true)
 	  -config file
-	       	configuration file (default "config.gob")
+	    	configuration file (default "config.gob")
+	  -hosts list
+	    	hosts list (default "pushsvr.connector73.net")
 	  -indent
-	       	indent JSON response (default true)
-	  -key file
-	       	server private certificate file (default "key.pem")
+	    	indent JSON response (default true)
 	  -monitor
-	       	start monitor handler
+	    	start monitor handler
 	  -pools size
-	       	APNS client pool size (default 1)
+	    	APNS client pool size (default 2)
 	  -reset
-	       	remover users and admin authorization
+	    	remover users and admin authorization
 	  -store DSN
-	       	db DSN connection string (default "tokens.db")
+	    	db DSN connection string (default "tokens.db")
 
 
 ## Administration
