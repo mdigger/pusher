@@ -1,110 +1,66 @@
-package pusher
+package main
 
 import (
-	"bytes"
-	"crypto/tls"
-	"encoding/json"
-	"errors"
-	"net/http"
+	"encoding/gob"
 	"os"
-	"path/filepath"
-
-	"github.com/alexjlockwood/gcm"
-	"github.com/mdigger/apns"
 )
 
-// Bundle описывает информацию для подключения к сервису.
-type Bundle struct {
-	Type        string       `json:"type"`              // тип соединения: должно быть "apns"
-	BundleID    string       `json:"-"`                 // идентификатор приложения
-	Sandbox     bool         `json:"sandbox,omitempty"` // флаг соединения с отладочным сервером
-	Certificate [][]byte     `json:"certificate"`       // сертификаты TLS
-	PrivateKey  []byte       `json:"privateKey"`        // приватный ключ
-	ApiKey      string       `json:"apiKey"`            // ключ для отсылки GCM
-	apnsClient  *apns.Client // клиент для отсылки уведомлений
-	apnsConfig  *apns.Config // конфигурация для подключения к APNS
-	gcmClient   *gcm.Sender  // клиент для отправки GCM
-}
-
-// App описывает информацию о параметрах приложения.
-type App struct {
-	Name    string             `json:"-"`              // название приложения
-	Keys    []string           `json:"keys,omitempty"` // список ключей для авторизации
-	Bundles map[string]*Bundle `json:"bundles"`        // список поддерживаемых бандлов
-}
-
-// Config описывает настройки сервера.
+// Config описывает конфигурацию сервиса.
 type Config struct {
-	DB     string          `json:"db"`     // имя файла с хранилищем
-	Server string          `json:"server"` // адрес и порт для запуска сервиса
-	Apps   map[string]*App `json:"apps"`   // список поддерживаемых приложений
+	Authorization        // авторизация
+	APNS                 // список сертификатов и клиентов
+	store         *Store // хранилище пользователей и токенов устройств
+	filename      string // имя файла с конфигурацией
 }
 
-// LoadConfig читает конфигурационный файл и возвращает его описание.
+// Save сохраняет конфигурацию в файл.
+func (c *Config) Save() error {
+	filename := c.filename
+	if filename == "" {
+		filename = "config.gob"
+	}
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	err = gob.NewEncoder(file).Encode(configData{
+		Admin:        c.administrator,
+		Users:        c.getUsers(),
+		Certificates: c.getCertificates(),
+	})
+	file.Close()
+	return err
+}
+
+// LoadConfig загружает и разбирает сохраненную конфигурацию из файла.
 func LoadConfig(filename string) (*Config, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	config := new(Config)
-	if err := json.NewDecoder(file).Decode(config); err != nil {
+	var data configData
+	err = gob.NewDecoder(file).Decode(&data)
+	file.Close()
+	if err != nil {
 		return nil, err
 	}
-	if len(config.Apps) == 0 {
-		return nil, errors.New("apps not defined")
+	apns, err := restoreCertificates(data.Certificates)
+	if err != nil {
+		return nil, err
 	}
-	if config.DB == "" {
-		config.DB = "pusher.db" // имя файла с базой по умолчанию
-	}
-	// учитываем расположение файла конфигурации
-	config.DB = filepath.Join(filepath.Dir(filename), config.DB)
-	if config.Server == "" {
-		config.Server = "localhost:8080" // адрес и порт сервиса по умолчанию
-	}
-	// инициализируем клиентов для всех приложений
-	for appName, app := range config.Apps {
-		app.Name = appName // сохраняем имя приложения
-		// перебираем все бандлы
-		for bundleName, bundle := range app.Bundles {
-			bundle.BundleID = bundleName
-			switch bundle.Type {
-			case "apns":
-				cert, err := tls.X509KeyPair(
-					bytes.Join(bundle.Certificate, []byte{'\n'}), bundle.PrivateKey)
-				if err != nil {
-					return nil, err
-				}
-				var conf = &apns.Config{
-					BundleID:    bundle.BundleID,
-					Sandbox:     bundle.Sandbox,
-					Certificate: cert,
-				}
-				conf.SetLogger(nil)
-				bundle.apnsConfig = conf
-				bundle.apnsClient = apns.NewClient(conf)
-			case "gcm":
-				bundle.gcmClient = &gcm.Sender{
-					ApiKey: bundle.ApiKey,
-					Http:   http.DefaultClient,
-				}
-			}
-		}
-	}
-	return config, nil
+	return &Config{
+		Authorization: Authorization{
+			administrator: data.Admin,
+			users:         restoreUsers(data.Users),
+		},
+		APNS:     *apns,
+		filename: filename,
+	}, nil
 }
 
-// Save сохраняет конфигурацию в файл.
-func (c *Config) Save(filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	data, err := json.MarshalIndent(c, "", "\t")
-	if err != nil {
-		return err
-	}
-	_, err = file.Write(data)
-	return err
+// configData информация о конфигурации для сохранения.
+type configData struct {
+	Admin        *user              // административная учетная запись
+	Users        []user             // список пользователей
+	Certificates []*certificateData // список сертификатов
 }
