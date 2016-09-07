@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mdigger/apns3"
+	"github.com/mdigger/apns"
 )
 
 // Client описывает пул клиентов для отправки уведомлений,

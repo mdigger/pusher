@@ -2,8 +2,8 @@
 
 ## Service params
 
-	$ ./pusher2 --help
-	# Pusher 2.0.25 [git 38cabcb] (2016-09-01)
+	$ ./pusher --help
+	# Pusher 2.0.27 [git 38cabcb] (2016-09-01)
 	Usage of ./pusher2:
 	  -addr port
 	       	http server address and port (default ":8443")

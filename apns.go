@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mdigger/apns3"
+	"github.com/mdigger/apns"
 )
 
 // PoolCount описывает количество создаваемых клиентов в пуле.

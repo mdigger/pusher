@@ -12,7 +12,7 @@ debug:
 	@echo "remove config..."
 	@rm -f test_config.gob test_store.db
 	@echo "run..."
-	@./pusher2 -config "test_config.gob" -store "memory://test_store.db" -reset -indent -monitor
+	@./pusher -config "test_config.gob" -store "memory://test_store.db" -reset -indent -monitor
 
 build:
 	@echo "build..."

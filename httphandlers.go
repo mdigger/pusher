@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/crypto/pkcs12"
 
-	"github.com/mdigger/apns3"
+	"github.com/mdigger/apns"
 	"github.com/mdigger/rest"
 )
 
