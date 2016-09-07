@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -32,6 +33,11 @@ func main() {
 	}
 	ver = fmt.Sprintf("%s (%s)", ver, date)
 	fmt.Fprintln(os.Stderr, ver)
+
+	// изменяем путь на текущий каталог с программой по умолчанию
+	if err := os.Chdir(filepath.Dir(os.Args[0])); err != nil {
+		log.Fatalf("Error changing current dir: %v", err)
+	}
 
 	// разбираем параметры запуска приложения
 	configFile := flag.String("config", "config.gob", "configuration `file`")
