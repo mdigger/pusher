@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -8,7 +9,10 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/mdigger/rest"
 )
@@ -31,15 +35,17 @@ func main() {
 
 	// разбираем параметры запуска приложения
 	configFile := flag.String("config", "config.gob", "configuration `file`")
-	addr := flag.String("addr", ":8443", "http server address and `port`")
-	cert := flag.String("cert", "cert.pem", "server certificate `file`")
-	key := flag.String("key", "key.pem", "server private certificate `file`")
+	addr := flag.String("addr", ":https", "http server address and `port`") // ":8443"
+	// cert := flag.String("cert", "cert.pem", "server certificate `file`")
+	// key := flag.String("key", "key.pem", "server private certificate `file`")
 	storeDB := flag.String("store", "tokens.db", "db `DSN` connection string")
 	compress := flag.Bool("compress", true, "gzip compress response")
 	indent := flag.Bool("indent", true, "indent JSON response")
 	monitor := flag.Bool("monitor", false, "start monitor handler")
 	reset := flag.Bool("reset", false, "remover users and admin authorization")
-	flag.UintVar(&PoolCount, "pools", 1, "APNS client pool `size`")
+	cache := flag.String("cache", "letsencrypt.cache", "letsencrypt cache `folder`")
+	hosts := flag.String("hosts", "pushsvr.connector73.net", "hosts `list`")
+	flag.UintVar(&PoolCount, "pools", 2, "APNS client pool `size`")
 	flag.Parse()
 
 	if PoolCount == 0 {
@@ -82,16 +88,40 @@ func main() {
 	if *monitor {
 		registerExpVar(mux) // добавляем монитор
 	}
+
+	if *cache == "" {
+		*cache = "letsencrypt.cache"
+	}
+
+	hostsList := strings.Split(*hosts, ",")
+	for i, list := range hostsList {
+		hostsList[i] = strings.TrimSpace(list)
+	}
+	if len(hostsList) == 0 {
+		log.Fatalln("Empty hosts list")
+	}
+
+	tlsManager := autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		Cache:      autocert.DirCache(*cache),
+		HostPolicy: autocert.HostWhitelist(hostsList...),
+	}
+
 	// запускаем сервис
 	go func() {
 		log.Printf("Starting service at %q", *addr)
 		srv := &http.Server{
 			Addr:         *addr,
 			Handler:      mux,
-			ReadTimeout:  5 * time.Second,
-			WriteTimeout: 120 * time.Second,
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+			TLSConfig: &tls.Config{
+				GetCertificate: tlsManager.GetCertificate,
+			},
 		}
-		log.Println(srv.ListenAndServeTLS(*cert, *key))
+		log.Println(srv.ListenAndServeTLS("", ""))
+		// log.Println(srv.ListenAndServeTLS(*cert, *key))
+
 		store.Close() // закрываем соединение с базой
 		os.Exit(2)    // останавливаем сервис
 	}()
