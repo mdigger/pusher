@@ -50,7 +50,7 @@ func main() {
 	monitor := flag.Bool("monitor", false, "start monitor handler")
 	reset := flag.Bool("reset", false, "remover users and admin authorization")
 	cache := flag.String("cache", "letsencrypt.cache", "letsencrypt cache `folder`")
-	hosts := flag.String("hosts", "pushsvr.connector73.net,89.185.246.186", "hosts `list`")
+	hosts := flag.String("hosts", "pushsvr.connector73.net", "hosts `list`")
 	flag.UintVar(&PoolCount, "pools", 2, "APNS client pool `size`")
 	flag.Parse()
 
