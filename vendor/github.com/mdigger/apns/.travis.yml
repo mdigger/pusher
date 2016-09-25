@@ -1,0 +1,20 @@
+language: go
+go:
+- tip
+notifications:
+  email: false
+before_install:
+- openssl aes-256-cbc -K $encrypted_0e4c5f4e1133_key -iv $encrypted_0e4c5f4e1133_iv
+  -in certificates.tar.enc -out certificates.tar -d
+- tar xvf certificates.tar
+install:
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
+- go get -t -v ./...
+script:
+- go test -v -race -covermode=atomic -coverprofile=coverage.out
+- $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken
+  $COVERALLS_TOKEN
+env:
+  global:
+    secure: n7x3PAJLCWvFFqdLDyNcSlOZ50HeCMPH/CExk8HPAabnyKY4/l0TZbS5BNqSXlR9un0X/eFNgfCkiEuZhpGEDLDe/BGg7Nr30q2YleaxPoioKif+AZGLfm+4aqA/iNbpT6RQi7QqFt+wJfgFoNtpVri0nK0Xo3ut1JFPHC3sQ7j52a0GffAdPgWqqGDm5f3znftFYzpZ18B6p3lnfo8ZIpqvjeewyEi0xP516nd3trUy73mmg5T24Vl7WiByusM6zIdcFLzvLBCzWzuZlii9dLcH+mlRy1XnqAcJrCI3fWk3G1Pq4SK7Mym/YsQzammEG+Bl1qpZoNGQTcyZ2RjyGNsOuYNsvTlH3Jy0Cia2rqqi6ziyf6RV/q6F5PPAaJB8qx6uxQmSRHk4UM2F7w/pe2m901mtt7anEA1Hi9ZamSQ96cWqphxt8kfN1ZY/xmFBzHzjOo6zXp/kvxXTjLRIj27aB51fE8fCPyeqI1tgqvO6WYPyhGjVFx7DYjSRXBBVMYW/STQzAjWM3Y6944sFXHMMap0xK4wyabCJLDJ0Fx05Gs1DuhyPYqlncaR2UtQXW5r36I6ncfaM0dQLj7N81Elf1OJPDCD1aRrxGlXR/wp3FPASeesAcWPVwvFtDq7eH/tPmuoi0UMcqSyvCU0ydKFIliITdKTcacxeJyvzDvA=
