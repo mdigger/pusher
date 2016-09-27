@@ -1,0 +1,15 @@
+language: go
+go:
+- 1.7
+- tip
+install:
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
+- go get -t -v ./...
+script:
+- go test -v -race -covermode=count -coverprofile=coverage.out
+- $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
+notifications:
+  email: false
+env:
+  secure: f51jR0vgqDijhpEMkyd16gIHfHX6f6WRGlHUm3M9Zln/U4i1I0K1bEbmf3jaNN2Ga6RM+v9of13KUJFAW/g6Pl5s6Y4tK2nJwFwXNEevqb6xw7RAVBW1rToQMngUrlxyose9yVso70gGKrYsMAaVohKTc6K5gNECgKZsH3wlbP7yeKFUmJYTUmYTXtxAWW79qhwzBbFTCyTcuXn+2cUpmt1/KvoQzQFUvD8c51TtJoowboh32fXEI1BYyoQF1gGzXRgnk8apm4Rl2achFDRqNkpY/4JayQRgZKmLFwc4biKgrTrzEjxt5d9CHeKqo0NMUsGwnpH6B0ffkdvHR8IzVu5zS71APE3nD4K1LbJs++eIKsVGpjiRqhnjgwzEvdiZ7Q11tvmnQ2w3OE2QL29tv3ShAOxnht5JIZJPEVJR0JUXUxcFrM7jCjF/ckGVFOyxTDJ+sb3StqKZGkes23hT/8UnkNKTP7lARE0KH3SeUUfvS45l0nVfjtW5mRKIJVD/Vw/h1nbcMFce4hbZRiKQjkd1QfvvEVtEUYu9VPpWrWbr+8utnxjpB42J2R2YpCuL2klqXO1xKlFeLdR8pQrXUl4roxY0X6sZ6qi/veOiN5wjuEqlLoo0RObkSpxsg8O237xwIFF9quezsA1o22Kb+XKcYhj26MU6706KeUCBzNg=
