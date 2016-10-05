@@ -99,19 +99,20 @@ func (s *Store) GetUserTopicTokens(topic string, sandbox bool, users ...string) 
 
 // Remove удаляет токен из хранилища, если он был добавлен после указанной даты.
 func (s *Store) Remove(token, topic string, timestamp time.Time, sandbox bool) error {
-	if timestamp.IsZero() {
-		timestamp = time.Now()
-	}
+	// if timestamp.IsZero() {
+	// 	timestamp = time.Now()
+	// }
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketName(topic, sandbox))
 		if bucket == nil {
 			return nil
 		}
 		key := []byte(token)
-		added, _ := timeAndName(bucket.Get(key))
-		if added.Before(timestamp) {
-			bucket.Delete(key)
-		}
+		// added, _ := timeAndName(bucket.Get(key))
+		// if added.Before(timestamp) {
+		// FIX: удаляем всегда, не смотря на время
+		bucket.Delete(key)
+		// }
 		return nil
 	})
 }
