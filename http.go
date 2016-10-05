@@ -194,7 +194,7 @@ func (s *Service) GetTokens(w http.ResponseWriter, r *http.Request) (int, error)
 	}
 	if len(tokens) == 0 {
 		return http.StatusNotFound,
-			fmt.Errorf("tokens for user %s not redistered", user)
+			fmt.Errorf("tokens for user %s not registered", user)
 	}
 	return rest.Write(w, r, http.StatusOK, rest.JSON{"tokens": tokens})
 }
@@ -260,7 +260,7 @@ func (s *Service) PushUser(w http.ResponseWriter, r *http.Request) (int, error) 
 	}
 	if len(tokens) == 0 {
 		return http.StatusNotFound,
-			fmt.Errorf("tokens for user %s not redistered", user)
+			fmt.Errorf("tokens for user %s not registered", user)
 	}
 	// разбираем запроса для отправки уведомления
 	var notification = new(struct {
