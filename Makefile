@@ -9,10 +9,8 @@ run: debug
 debug:
 	@echo "debug build..."
 	@go build -race $(FLAGS)
-	@echo "remove config..."
-	@rm -f test_config.gob test_store.db
 	@echo "run..."
-	@./pusher -config "test_config.gob" -store "memory://test_store.db" -reset -indent -monitor
+	@./pusher -address localhost:8080
 
 build:
 	@echo "build..."
