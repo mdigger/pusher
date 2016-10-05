@@ -5,3 +5,5 @@ install:
 - go get golang.org/x/tools/cmd/cover
 - go get github.com/mattn/goveralls
 - go get -t -v ./...
+script:
+- go test -v -race -covermode=atomic -coverprofile=coverage.out
