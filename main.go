@@ -4,173 +4,131 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/mdigger/rest"
+	"github.com/mdigger/log"
 )
 
 var (
-	appName = "Pusher"     // название приложения
-	version = "2.0.27"     // версия
-	date    = "2016-09-07" // дата сборки
-	build   = ""           // номер сборки в git-репозитории
+	appName = "pusher"                      // название сервиса
+	version = "2.1.29"                      // версия
+	date    = "2016-10-04"                  // дата сборки
+	build   = ""                            // номер сборки в git-репозитории
+	host    = "pushsvr.connector73.net:443" // адрес сервера и порт
+	config  = appName + ".json"             // имя конфигурационного файла
+	agent   = fmt.Sprintf("%s/%s", appName, version)
 )
 
 func main() {
-	// выводим версию приложения
-	ver := fmt.Sprintf("# %s %s", appName, version)
-	if build != "" {
-		ver = fmt.Sprintf("%s [git %s]", ver, build)
-	}
-	ver = fmt.Sprintf("%s (%s)", ver, date)
-	fmt.Fprintln(os.Stderr, ver)
-
-	// изменяем путь на текущий каталог с программой по умолчанию
-	if err := os.Chdir(filepath.Dir(os.Args[0])); err != nil {
-		log.Fatalf("Error changing current dir: %v", err)
-	}
+	log.SetLevel(log.DebugLevel)
+	log.SetFlags(0)
+	// выводим информацию о версии сборки
+	log.WithFields(log.Fields{
+		"version": version,
+		"date":    date,
+		"build":   build,
+		"name":    appName,
+	}).Info("starting service")
 
 	// разбираем параметры запуска приложения
-	configFile := flag.String("config", "config.gob", "configuration `file`")
-	addr := flag.String("addr", ":https", "http server address and `port`") // ":8443"
-	// cert := flag.String("cert", "cert.pem", "server certificate `file`")
-	// key := flag.String("key", "key.pem", "server private certificate `file`")
-	storeDB := flag.String("store", "tokens.db", "db `DSN` connection string")
-	compress := flag.Bool("compress", true, "gzip compress response")
-	indent := flag.Bool("indent", true, "indent JSON response")
-	monitor := flag.Bool("monitor", false, "start monitor handler")
-	reset := flag.Bool("reset", false, "remover users and admin authorization")
-	cache := flag.String("cache", "letsencrypt.cache", "letsencrypt cache `folder`")
-	hosts := flag.String("hosts", "pushsvr.connector73.net", "hosts `list`")
-	flag.UintVar(&PoolCount, "pools", 2, "APNS client pool `size`")
+	flag.StringVar(&config, "config", config, "config `filename`")
+	flag.StringVar(&host, "address", host, "server address and `port`")
 	flag.Parse()
 
-	if PoolCount == 0 {
-		PoolCount = 1 // минимальное количество клиентов в пуле
-	}
-	// загружаем конфигурационный файл
-	config, err := LoadConfig(*configFile)
+	// загружаем конфигурацию сервиса
+	log.WithField("file", config).Info("loading config")
+	serviceConfig, err := LoadConfig(config)
 	if err != nil {
-		log.Println("Error loading config:", err)
-		log.Println("Using empty config")
-		// инициализируем пустую конфигурацию
-		config = &Config{filename: *configFile}
-		if err := config.Save(); err != nil {
-			log.Fatalln("Error saving config:", err)
-		}
-	} else if *reset {
-		log.Println("Reset users and admin authorizations")
-		config.Reset()
-		if err := config.Save(); err != nil {
-			log.Fatalln("Error saving config:", err)
-		}
+		log.WithError(err).Error("loading config error")
+		os.Exit(1)
 	}
-
-	// инициализируем хранилище токенов
-	store, err := OpenStore(*storeDB)
+	defer serviceConfig.Close()
+	// инициализируем сервис
+	var service = NewService(serviceConfig)
+	// инициализируем HTTP-сервер
+	server := &http.Server{
+		Addr:         host,
+		Handler:      service.mux,
+		ReadTimeout:  time.Second * 60,
+		WriteTimeout: time.Second * 120,
+	}
+	// для защищенного соединения проделываем дополнительные настройки
+	host, port, err := net.SplitHostPort(host)
 	if err != nil {
-		log.Fatalln("Error initializing store:", err)
+		log.WithError(err).Error("bad server address")
+		os.Exit(2)
 	}
-	config.store = store // подключаем хранилище токенов
-	// подключаем функцию удаления устаревших и плохих токенов
-	config.APNS.deleteUserToken = store.DeleteUserToken
-
-	rest.Compress = *compress // включаем/выключаем сжатие ответов
-	// 32 мегабайта и отступы
-	rest.Encoder = rest.JSONCoder{1 << 15, *indent}
-	rest.Debug = true // включаем вывод информации об ошибках
-	// регистрируем обработчики HTTP-запросов
-	var mux = new(rest.ServeMux)
-	config.registerHandlers(mux) // регистрируем обработчики
-	if *monitor {
-		registerExpVar(mux) // добавляем монитор
-	}
-
-	if *cache == "" {
-		*cache = "letsencrypt.cache"
-	}
-
-	hostsList := strings.Split(*hosts, ",")
-	for i, list := range hostsList {
-		hostsList[i] = strings.TrimSpace(list)
-	}
-	if len(hostsList) == 0 {
-		log.Fatalln("Empty hosts list")
-	}
-
-	tlsManager := autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		Cache:      autocert.DirCache(*cache),
-		HostPolicy: autocert.HostWhitelist(hostsList...),
-	}
-
-	// запускаем сервис
-	go func() {
-		log.Printf("Starting service at %q", *addr)
-		srv := &http.Server{
-			Addr:         *addr,
-			Handler:      mux,
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
-			TLSConfig: &tls.Config{
-				GetCertificate: tlsManager.GetCertificate,
-			},
+	if port == "https" || port == "443" {
+		if host != "localhost" && host != "127.0.0.1" {
+			manager := autocert.Manager{
+				Prompt:     autocert.AcceptTOS,
+				HostPolicy: autocert.HostWhitelist(host),
+				Email:      "dmitrys@xyzrd.com",
+				Cache:      autocert.DirCache("letsEncript.cache"),
+			}
+			server.TLSConfig = &tls.Config{
+				GetCertificate: manager.GetCertificate,
+			}
+		} else {
+			// исключительно для отладки
+			cert, err := tls.X509KeyPair(LocalhostCert, LocalhostKey)
+			if err != nil {
+				panic(fmt.Sprintf("local certificates error: %v", err))
+			}
+			server.TLSConfig = &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			}
 		}
-		log.Println(srv.ListenAndServeTLS("", ""))
-		// log.Println(srv.ListenAndServeTLS(*cert, *key))
+		// запускаем автоматический переход для HTTP на HTTPS
+		go func() {
+			log.Info("starting http redirect")
+			err := http.ListenAndServe(":http", http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					http.Redirect(w, r,
+						"https://"+r.Host+r.URL.String(),
+						http.StatusMovedPermanently)
+				}))
+			if err != nil {
+				log.WithError(err).Warning("http redirect server error")
+			}
+		}()
+		// запускаем основной сервер
+		go func() {
+			log.WithFields(log.Fields{
+				"address": server.Addr,
+				"host":    host,
+			}).Info("starting https")
+			err = server.ListenAndServeTLS("", "")
+			// корректно закрываем сервисы по окончании работы
+			log.WithError(err).Warning("https server stoped")
+			os.Exit(3)
+		}()
+	} else {
+		// не защищенный HTTP сервер
+		go func() {
+			log.WithField("address", server.Addr).Info("starting http")
+			err = server.ListenAndServe()
+			log.WithError(err).Warning("http server stoped")
+			os.Exit(3)
+		}()
+	}
 
-		store.Close() // закрываем соединение с базой
-		os.Exit(2)    // останавливаем сервис
-	}()
-
-	// go func() {
-	// 	for {
-	// 		log.Println("Goroutines:", runtime.NumGoroutine())
-	// 		time.Sleep(time.Second * 5)
-	// 	}
-	// }()
-
-	// инициализируем поддержку системных сигналов и ждем, когда он случится...
+	// инициализируем поддержку системных сигналов и ждем, когда он случится
 	monitorSignals(os.Interrupt, os.Kill)
-	store.Close() // закрываем соединение с базой
+	log.Info("service stoped")
 }
 
-// monitorSignals запускает мониторинг сигналов и возвращает значение, когда получает сигнал.
-// В качестве параметров передается список сигналов, которые нужно отслеживать.
+// monitorSignals запускает мониторинг сигналов и возвращает значение, когда
+// получает сигнал. В качестве параметров передается список сигналов, которые
+// нужно отслеживать.
 func monitorSignals(signals ...os.Signal) os.Signal {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, signals...)
 	return <-signalChan
-}
-
-// registerExpVar регистрирует обработчик, отдающий информацию о запущенном
-// процессе.
-func registerExpVar(mux *rest.ServeMux) {
-	var startTime = time.Now().UTC() // время запуска сервиса
-	log.Printf("Monitor handler started at %q", "/debug/vars")
-	mux.Handle("GET", "/debug/vars", func(c *rest.Context) error {
-		var stats = struct {
-			Uptime     int64            `json:"uptime"`
-			Goroutines int              `json:"goroutines"`
-			NumCPU     int              `json:"numcpu"`
-			NumCgoCall int64            `json:"numcgocall"`
-			MemStats   runtime.MemStats `json:"memstats"`
-		}{
-			Uptime:     int64(time.Since(startTime)),
-			Goroutines: runtime.NumGoroutine(),
-			NumCPU:     runtime.NumCPU(),
-			NumCgoCall: runtime.NumCgoCall(),
-		}
-		runtime.ReadMemStats(&stats.MemStats)
-		return c.Send(stats)
-	})
 }
