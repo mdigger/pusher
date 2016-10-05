@@ -1,5 +1,7 @@
 # Apple Push Notification Service Provider
 
+[![Build Status](https://travis-ci.org/mdigger/pusher.svg?branch=master)](https://travis-ci.org/mdigger/pusher)
+
 ## POST /apns/com.xyzrd.trackintouch/users/dmitrys
 
 + Request (application/json; charset=utf-8)
