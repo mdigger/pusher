@@ -278,6 +278,7 @@ func (s *Service) PushUser(w http.ResponseWriter, r *http.Request) (int, error) 
 	}
 	// формируем данные для уведомления
 	var n = Notification{
+		Payload:     notification.Payload,
 		Expiration:  notification.Expiration,
 		LowPriority: notification.LowPriority,
 		Topic:       topic,
@@ -338,6 +339,7 @@ func (s *Service) Push(w http.ResponseWriter, r *http.Request) (int, error) {
 	}
 	// формируем данные для уведомления
 	var n = Notification{
+		Payload:     notification.Payload,
 		Expiration:  notification.Expiration,
 		LowPriority: notification.LowPriority,
 		Topic:       topic,

@@ -5,3 +5,7 @@
 *.db
 *.sh
 pusher
+
+*.p8
+
+config_test.go
