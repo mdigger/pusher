@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/mdigger/log"
-	"github.com/mdigger/rest3"
+	"github.com/mdigger/rest"
 )
 
 type Service struct {
